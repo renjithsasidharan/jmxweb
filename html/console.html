@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="../javascript/jquery-2.0.1.min.js"></script>
+    <script src="../javascript/jquery.jstree.js"></script>
+    <script src="../javascript/handlebars.js"></script>
+    <script src="../javascript/jolokia-min.js"></script>
+    <script src="../javascript/jquery.cookie.js"></script>
+    <script src="../javascript/jquery.hotkeys.js"></script>
+    <script src="../javascript/jquery.tablesorter.pager.js"></script>
+</head>
+<body>
+
+<div id="nav" class="jstree"></div>
+<script type="text/javascript">
+    function extractDomainMap(mbeans) {
+        var domains = {};
+        for (var i = 0; i < mbeans.length; i++) {
+            var mbean = mbeans[i];
+            var domainEnd = mbean.indexOf(":");
+            var domainName = mbean.substring(0, domainEnd);
+            var domain = domains[domainName];
+            if (domain == null) {
+                domain = {"name": domainName, "entries": {}};
+                domains[domainName] = domain;
+            }
+            var container = domain.entries;
+            var tokens = mbean.substring(domainEnd + 1).split(",");
+            for (var ii = 0; ii < tokens.length; ii++) {
+                var token = tokens[ii];
+                var typeEnd = token.indexOf("=");
+                var name = token.substring(typeEnd + 1);
+                var item = container[name];
+                if (item == null) {
+                    item = {"name": name, "entries": []};
+                    container[name] = item;
+                }
+                if (ii == (tokens.length - 1)) {
+                    item.mbean = mbean;
+                }
+                container = item.entries;
+            }
+        }
+        return domains;
+    }
+
+    function createJsTreeDataRecursive(entries, children) {
+        var i = 0;
+        for (var itemName in entries) {
+            if (entries.hasOwnProperty(itemName)) {
+                var item = entries[itemName];
+                var node = {"data": item.name, "children": []};
+                if (item.mbean != null) {
+                    node.metadata = {"mbean": item.mbean};
+                }
+                children[i] = node;
+                createJsTreeDataRecursive(item.entries, node.children);
+                i++;
+            }
+        }
+    }
+
+    function createJsTreeData(domains) {
+        var data = {"data" : []};
+        var i = 0;
+        for (var domainName in domains) {
+            if (domains.hasOwnProperty(domainName)) {
+                var domain = domains[domainName];
+                var node = {"data": domain.name, "children": []};
+                data.data[i] = node;
+                createJsTreeDataRecursive(domain.entries, node.children);
+                i++;
+            }
+        }
+        return data;
+    }
+
+    function searchAll() {
+        var response = new Jolokia({"url": "http://localhost:7777/jolokia"}).request(
+                {type: "search", mbean:"*:*", keyorder:"constructionTime"},
+                {method: "post"});
+        response.value.sort();
+        return createJsTreeData(extractDomainMap(response.value));
+    }
+
+    var data = searchAll();
+    $("#nav")
+            .jstree ({
+        "json_data" : data,
+        "themes" : {
+            "theme" : "classic",
+            "dots" : false
+        },
+        "core" : {
+            "animation" : 50
+        },
+        "plugins" : ["themes", "classic", "json_data","ui"]
+    })
+            .bind("select_node.jstree", function (event, data) {
+                var mbean = data.rslt.obj.data("mbean");
+                if (mbean != null) {
+                    listMbean(mbean);
+                }
+            });
+</script>
+
+</body>
+</html>
