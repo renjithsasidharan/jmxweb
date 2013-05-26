@@ -1,18 +1,28 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <script src="../javascript/jquery-2.0.1.min.js"></script>
+    <head>
+    <script src="../javascript/jquery-latest.js"></script>
     <script src="../javascript/jquery.jstree.js"></script>
     <script src="../javascript/handlebars.js"></script>
     <script src="../javascript/jolokia-min.js"></script>
     <script src="../javascript/jquery.cookie.js"></script>
     <script src="../javascript/jquery.hotkeys.js"></script>
-    <script src="../javascript/jquery.tablesorter.pager.js"></script>
+    <script src="../javascript/jquery.tablesorter.js"></script>
+    <link rel="stylesheet" href="../css/style.css" type="text/css" media="screen" />
 </head>
 <body>
 
-<div id="nav" class="jstree"></div>
-<script type="text/javascript">
+
+    <div style="width: 100%; overflow: auto;">
+		<div  id="nav" class="jstree" style="width: 30%; float: left;">
+
+		</div>
+		<div id="attributes" style="width: 70%; float: left;">
+
+		</div>
+    </div>
+
+    <script type="text/javascript">
     function extractDomainMap(mbeans) {
         var domains = {};
         for (var i = 0; i < mbeans.length; i++) {
@@ -102,6 +112,83 @@
                     listMbean(mbean);
                 }
             });
+</script>
+
+    <script id="attributes-template" type="text/x-handlebars-template">
+        <table id="attributes-table" class="tablesorter">
+            <thead>
+            <th>Name</th>
+            <th>Value</th>
+            </thead>
+            <tbody>
+            {{#attributes}}
+            <tr>
+                <td>{{name}}</td>
+                <td id='{{name}}'>
+                    {{#if value.rw}}
+                    <input class="attr-input" id='attr-input-{{name}}' name='{{name}}' type='text' value=''>
+                    <input class="attr-submit" id='attr-submit-{{name}}' name='Save' type='submit' value='Save' onclick="updateAttribute('{{name}}')">
+                    {{/if}}
+                </td>
+            </tr>
+            {{/attributes}}
+            </tbody>
+        </table>
+    </script>
+
+
+
+
+
+    <script type="text/javascript">
+    var currentMbean;
+    function listMbean(mbean) {
+        var path = mbean.replace(new RegExp("/", 'g'), "!/");
+        path = path.replace(":", "/");
+        var meta = new Jolokia({"url": "http://localhost:7777/jolokia"}).request(
+                {"type": "list", "path": path},
+                {method: "post"});
+        currentMbean = mbean;
+        currentMeta = meta;
+        $("#mbeanInfo").html("<h2 id='mbeanName'>" + mbean + "</h2><p>" + meta.value.desc + "</p>");
+        var attributes = { 'attributes' : [] };
+        for (var attr in meta.value.attr) {
+            if (meta.value.attr.hasOwnProperty(attr)) {
+                attributes['attributes'].push({
+                    'name' : attr,
+                    'value' : meta.value.attr[attr]
+                });
+            }
+        }
+        var source = $("#attributes-template").html();
+        var template = Handlebars.compile(source);
+        $("#attributes").html(template(attributes));
+        $("#attributes-table").tablesorter({widgets: ['zebra']});
+        // inject the values
+        var values = new Jolokia({"url": "http://localhost:7777/jolokia"}).request(
+                {"type": "read", "mbean": mbean},
+                {method: "post"});
+        for (var attr in values.value) {
+            if (values.value.hasOwnProperty(attr)) {
+                var value = values.value[attr];
+                if (meta.value.attr[attr].rw) {
+                    $("#attr-input-" + attr).val(value);
+                } else {
+                    $("#" + attr).html(value);
+                }
+            }
+        }
+    }
+
+
+    function updateAttribute(name) {
+        var mbean = currentMbean;
+        var value = $("#attr-input-" + name).val();
+        new Jolokia({"url": "http://localhost:7777/jolokia"}).request(
+                {"type": "write", "mbean": mbean, "attribute": name, "value": value},
+                {method: "post"});
+        listMbean(mbean);
+    }
 </script>
 
 </body>
