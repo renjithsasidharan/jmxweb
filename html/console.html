@@ -18,8 +18,16 @@
 		<div  id="nav" class="jstree" style="width: 30%; float: left;">
 
 		</div>
-		<div id="attributes" style="width: 70%; float: left;">
+		<div id="rightFrame" style="width: 70%; float: left;">
+            <div id="mbeanInfo"  style="width: 100%; float: left;">
 
+            </div>
+            <div id="attributes" style="width: 100%; float: left;">
+
+            </div>
+            <div id="operations" style="width: 100%; float: left;">
+
+            </div>
 		</div>
     </div>
 
@@ -137,6 +145,29 @@
         </table>
     </script>
 
+    <script id="operations-template" type="text/x-handlebars-template">
+        <table id="operations-table" class="tablesorter">
+            <thead>
+            <th>Operation</th>
+            <th>Action</th>
+            </thead>
+            <tbody>
+            {{#operations}}
+            <tr>
+                <td>{{name}}</td>
+                <td id='{{name}}'>
+                   {{#operations.args}}
+                    <input class="op-input" id='op-input-{{name}}' name='{{name}}' type='text' value=''>
+                   {{/operations.args}}
+                    <!--input class="op-input" id='op-input-{{name}}' name='{{name}}' type='text' value=''-->
+                    <input class="op-submit" id='op-submit-{{name}}' name='Execute' type='submit' value='Execute' >
+                </td>
+            </tr>
+            {{/operations}}
+            </tbody>
+        </table>
+    </script>
+
 
 
 
@@ -152,7 +183,10 @@
         currentMbean = mbean;
         currentMeta = meta;
         $("#mbeanInfo").html("<h2 id='mbeanName'>" + mbean + "</h2><p>" + meta.value.desc + "</p>");
+
         var attributes = { 'attributes' : [] };
+        var operations = { 'operations' : [] };
+
         for (var attr in meta.value.attr) {
             if (meta.value.attr.hasOwnProperty(attr)) {
                 attributes['attributes'].push({
@@ -161,10 +195,53 @@
                 });
             }
         }
+
+
+        for (var op in meta.value.op) {
+            if (meta.value.op.hasOwnProperty(op)) {
+                operations['operations'].push({
+                    'name' : op,
+                    'value' : meta.value.op[op],
+                    'args' : meta.value.op[op].args
+                });
+            }
+        }
+
+
+        Handlebars.registerHelper('op-arguments', function() {
+            return new Handlebars.SafeString(
+                    "<input class=\"op-input\" id='op-input'" + this.name +"' name='" + this.name +"' type='text' value=''>"
+            );
+        });
+
+
         var source = $("#attributes-template").html();
         var template = Handlebars.compile(source);
         $("#attributes").html(template(attributes));
         $("#attributes-table").tablesorter({widgets: ['zebra']});
+
+        var source = $("#operations-template").html();
+        var template = Handlebars.compile(source);
+        $("#operations").html(template(operations));
+        $("#operations-table").tablesorter({widgets: ['zebra']});
+
+        for (var op in meta.value.op) {
+            if (meta.value.op.hasOwnProperty(op)) {
+                var opArguments = { 'op-arguments' : [] };
+                var i = 0 ;
+                for (var i in meta.value.op[op].args) {
+                    opArguments['op-arguments'].push({
+                        'name' :  meta.value.op[op].args[i].name,
+                        'type' :  meta.value.op[op].args[i].type
+                    });
+                }
+            //    var source = $("#" + op).html();
+            //    var template = Handlebars.compile(source);
+            //    $("#op-arguments").html(template(opArguments));
+            }
+        }
+
+
         // inject the values
         var values = new Jolokia({"url": "http://localhost:7777/jolokia"}).request(
                 {"type": "read", "mbean": mbean},
@@ -180,6 +257,7 @@
             }
         }
     }
+
 
 
     function updateAttribute(name) {
