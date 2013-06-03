@@ -5,9 +5,7 @@
   version="2.5">
 
   <display-name>App Eye</display-name>
-  <description>
-     Welcome to App Eye
-  </description>
+  <description> Welcome to App Eye </description>
   <welcome-file-list>
     <welcome-file>/html/console.html</welcome-file>
   </welcome-file-list>
